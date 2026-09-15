@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // CHOCADEIRA - CONTROLE V1.5
 // ESP32-WROOM-32E
 //
@@ -197,6 +197,15 @@ struct IncubationProfile
     const IncubationPhase* phases;
 };
 
+enum Profile
+{
+    PROFILE_GALINHA = 0,
+    PROFILE_CODORNA = 1,
+    PROFILE_PAVAO = 2,
+    PROFILE_PATO = 3,
+    PROFILE_CUSTOM = 4
+};
+
 
 // ============================================================
 // PERFIL CODORNA
@@ -206,11 +215,11 @@ const IncubationPhase quailPhases[] =
 {
     {
         1,
-        14,
+        7,
 
         37.5,
 
-        50.0,
+        55.0,
         2.0,
         65.0,
 
@@ -221,8 +230,24 @@ const IncubationPhase quailPhases[] =
     },
 
     {
+        8,
+        14,
+
+        37.5,
+
+        50.0,
+        2.0,
+        80.0,
+
+        2000,
+        60000,
+
+        true
+    },
+
+    {
         15,
-        17,
+        18,
 
         37.2,
 
@@ -246,6 +271,22 @@ const IncubationPhase chickenPhases[] =
 {
     {
         1,
+        7,
+
+        37.5,
+
+        55.0,
+        2.0,
+        65.0,
+
+        2000,
+        60000,
+
+        true
+    },
+
+    {
+        8,
         17,
 
         37.5,
@@ -286,6 +327,22 @@ const IncubationPhase peacockPhases[] =
 {
     {
         1,
+        7,
+
+        37.5,
+
+        55.0,
+        2.0,
+        65.0,
+
+        2000,
+        60000,
+
+        true
+    },
+
+    {
+        8,
         25,
 
         37.5,
@@ -326,6 +383,22 @@ const IncubationPhase duckPhases[] =
 {
     {
         1,
+        7,
+
+        37.5,
+
+        55.0,
+        2.0,
+        65.0,
+
+        2000,
+        60000,
+
+        true
+    },
+
+    {
+        8,
         25,
 
         37.5,
@@ -365,7 +438,7 @@ const IncubationPhase duckPhases[] =
 const IncubationProfile profileQuail =
 {
     "CODORNA",
-    17,
+    18,
     sizeof(quailPhases) / sizeof(quailPhases[0]),
     quailPhases
 };
@@ -425,6 +498,8 @@ const IncubationProfile* currentProfile =
 // ============================================================
 
 bool incubationActive = false;
+
+bool postIncubationMode = false;
 
 DateTime incubationStart;
 
@@ -948,6 +1023,12 @@ void restorePhase1Parameters()
     );
 }
 
+void configurePostIncubation()
+{
+    temperatureTarget = 37.5;
+    rhTarget = 55.0;
+}
+
 // ============================================================
 // BOMBA OFF
 // ============================================================
@@ -1172,7 +1253,7 @@ void humidityControl()
     if (!automaticControl)
         return;
 
-    if (!incubationActive)
+    if (!incubationActive && !postIncubationMode)
         return;
 
     if (isnan(currentHumidity))
@@ -2083,11 +2164,11 @@ void printProfiles()
     );
 
     Serial.println(
-        "CODORNA  - 17 dias"
+        "GALINHA  - 21 dias"
     );
 
     Serial.println(
-        "GALINHA  - 21 dias"
+        "CODORNA  - 18 dias"
     );
 
     Serial.println(
@@ -2490,6 +2571,9 @@ bool loadIncubationState()
     incubationActive =
         true;
 
+    postIncubationMode =
+        false;
+
     currentPhaseIndex =
         -1;
 
@@ -2510,8 +2594,13 @@ bool loadIncubationState()
         incubationActive =
             false;
 
+        postIncubationMode =
+            true;
+
         currentPhaseIndex =
             -1;
+
+        configurePostIncubation();
 
         saveIncubationState();
 
@@ -2651,6 +2740,9 @@ void startIncubation(
     incubationActive =
         true;
 
+    postIncubationMode =
+        false;
+
     currentPhaseIndex =
         -1;
 
@@ -2727,6 +2819,8 @@ void stopIncubation()
 {
     incubationActive = false;
 
+    postIncubationMode = false;
+
     currentPhaseIndex = -1;
 
     pumpOff();
@@ -2752,6 +2846,8 @@ void stopIncubation()
 void resetIncubation()
 {
     incubationActive = false;
+
+    postIncubationMode = false;
 
     currentPhaseIndex = -1;
 
@@ -4560,7 +4656,7 @@ void loop()
     // INCUBACAO
     // --------------------------------------------------------
 
-    if (incubationActive)
+    if (incubationActive || postIncubationMode)
     {
         // Verifica se mudou de fase.
         applyCurrentPhase();
@@ -4581,12 +4677,6 @@ void loop()
     );
 
     // --------------------------------------------------------
-    // Desliga a bomba
-    // --------------------------------------------------------
-
-    pumpOff();
-
-    // --------------------------------------------------------
     // Encerra incubacao
     // --------------------------------------------------------
 
@@ -4596,16 +4686,13 @@ void loop()
     currentPhaseIndex =
         -1;
 
-    controlState =
-        STATE_NORMAL;
+    postIncubationMode =
+        true;
 
-    // --------------------------------------------------------
-    // IMPORTANTE:
-    // volta temperatura, RH e demais parametros
-    // para a FASE 1 do perfil.
-    // --------------------------------------------------------
+    if (!pumpState)
+        controlState = STATE_NORMAL;
 
-    restorePhase1Parameters();
+    configurePostIncubation();
 
     // --------------------------------------------------------
     // Salva na NVS que o ciclo terminou.
@@ -4614,7 +4701,7 @@ void loop()
     saveIncubationState();
 
     Serial.println(
-        "[INCUBACAO] Parametros retornaram para FASE 1."
+        "[INCUBACAO] Controle pos-incubacao ativo."
     );
 }
 
